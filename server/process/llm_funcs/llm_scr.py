@@ -1,91 +1,73 @@
-# OpenAI tool calling with history 
-### Uses a sample function
+# Groq LLM with conversation history
 import yaml
-import gradio as gr
 import json
 import os
-from openai import OpenAI
+from pathlib import Path
+from groq import Groq
 
-with open('character_config.yaml', 'r') as f:
+# Get the project root directory
+# llm_scr.py -> llm_funcs -> process -> server -> G.I.R.L (project root)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+CONFIG_PATH = PROJECT_ROOT / 'character_config.yaml'
+
+with open(CONFIG_PATH, 'r') as f:
     char_config = yaml.safe_load(f)
 
-client = OpenAI(api_key=char_config['OPENAI_API_KEY'])
+client = Groq(api_key=char_config['GROQ_API_KEY'])
 
 # Constants
 HISTORY_FILE = char_config['history_file']
 MODEL = char_config['model']
-SYSTEM_PROMPT =  [
-        {
-            "role": "system",
-            "content": [
-                {
-                    "type": "input_text",
-                    "text": char_config['presets']['default']['system_prompt']  
-                }
-            ]
-        }
-    ]
+SYSTEM_MESSAGE = {
+    "role": "system",
+    "content": char_config['presets']['default']['system_prompt']
+}
 
 # Load/save chat history
 def load_history():
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "r") as f:
             return json.load(f)
-    return SYSTEM_PROMPT
+    return [SYSTEM_MESSAGE]
 
 def save_history(history):
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f, indent=2)
 
 
-
-def get_riko_response_no_tool(messages):
-
-    # Call OpenAI with system prompt + history
-    response = client.responses.create(
+def get_riko_response(messages):
+    """Call Groq API with conversation history"""
+    response = client.chat.completions.create(
         model=MODEL,
-        input= messages,
+        messages=messages,
         temperature=1,
-        top_p=1,
-        max_output_tokens=2048,
-        stream=False,
-        text={
-            "format": {
-            "type": "text"
-            }
-        },
+        max_tokens=2048,
     )
-
-    return response
+    return response.choices[0].message.content
 
 
 def llm_response(user_input):
-
     messages = load_history()
 
-    # Append user message to memory
+    # Append user message
     messages.append({
         "role": "user",
-        "content": [
-            {"type": "input_text", "text": user_input}
-        ]
+        "content": user_input
     })
 
+    # Get response from Groq
+    assistant_response = get_riko_response(messages)
 
-    riko_test_response = get_riko_response_no_tool(messages)
-
-
-    # just append assistant message to regular response. 
+    # Append assistant message
     messages.append({
-    "role": "assistant",
-    "content": [
-        {"type": "output_text", "text": riko_test_response.output_text}
-    ]
+        "role": "assistant",
+        "content": assistant_response
     })
 
     save_history(messages)
-    return riko_test_response.output_text
+    return assistant_response
 
 
 if __name__ == "__main__":
-    print('running main')
+    # Quick test
+    print(llm_response("Hello, who are you?"))

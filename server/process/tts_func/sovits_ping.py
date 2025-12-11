@@ -4,9 +4,14 @@ import time
 import soundfile as sf 
 import sounddevice as sd
 import yaml
+from pathlib import Path
+
+# Get the project root directory (parent of server/)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+CONFIG_PATH = PROJECT_ROOT / 'character_config.yaml'
 
 # Load YAML config
-with open('character_config.yaml', 'r') as f:
+with open(CONFIG_PATH, 'r') as f:
     char_config = yaml.safe_load(f)
 
 
